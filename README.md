@@ -1,6 +1,6 @@
 # Vektopay Java SDK
 
-Java SDK for Vektopay API (server-side). Supports transactions (checkout), charges, checkout sessions, and charge status polling.
+Java SDK for Vektopay API (server-side). Supports payments, checkout sessions, and payment status polling.
 
 ## Install (Gradle)
 
