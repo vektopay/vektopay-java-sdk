@@ -26,6 +26,30 @@ public class VektopayClient {
         return post("/v1/charges", input, input.getOrDefault("idempotencyKey", null));
     }
 
+    public JsonNode createTransaction(Map<String, Object> input) throws IOException, InterruptedException {
+        return post("/v1/transactions", input, null);
+    }
+
+    public JsonNode createCustomer(Map<String, Object> input) throws IOException, InterruptedException {
+        return post("/v1/customers", input, null);
+    }
+
+    public JsonNode updateCustomer(String id, Map<String, Object> input) throws IOException, InterruptedException {
+        return put("/v1/customers/" + id, input);
+    }
+
+    public JsonNode listCustomers(Map<String, Object> query) throws IOException, InterruptedException {
+        return get("/v1/customers" + buildQuery(query));
+    }
+
+    public JsonNode getCustomer(String id) throws IOException, InterruptedException {
+        return get("/v1/customers/" + id);
+    }
+
+    public JsonNode deleteCustomer(String id) throws IOException, InterruptedException {
+        return del("/v1/customers/" + id);
+    }
+
     public CheckoutSessionResponse createCheckoutSession(Map<String, Object> input) throws IOException, InterruptedException {
         JsonNode payload = post("/v1/checkout-sessions", input, null);
         return new CheckoutSessionResponse(
@@ -70,6 +94,23 @@ public class VektopayClient {
         return payload;
     }
 
+    private JsonNode put(String path, Map<String, Object> body) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("content-type", "application/json")
+                .header("x-api-key", apiKey)
+                .PUT(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+                .build();
+
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        JsonNode payload = mapper.readTree(response.body());
+        if (response.statusCode() >= 300) {
+            throw new RuntimeException(resolveError(payload, response.statusCode()));
+        }
+        return payload;
+    }
+
     private JsonNode get(String path) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + path))
@@ -84,6 +125,43 @@ public class VektopayClient {
             throw new RuntimeException(resolveError(payload, response.statusCode()));
         }
         return payload;
+    }
+
+    private JsonNode del(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("x-api-key", apiKey)
+                .DELETE()
+                .build();
+
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        JsonNode payload = mapper.readTree(response.body());
+        if (response.statusCode() >= 300) {
+            throw new RuntimeException(resolveError(payload, response.statusCode()));
+        }
+        return payload;
+    }
+
+    private String buildQuery(Map<String, Object> query) {
+        if (query == null || query.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : query.entrySet()) {
+            if (entry.getValue() == null) continue;
+            if (first) {
+                sb.append("?");
+                first = false;
+            } else {
+                sb.append("&");
+            }
+            sb.append(entry.getKey()).append("=").append(encode(entry.getValue().toString()));
+        }
+        return sb.toString();
+    }
+
+    private String encode(String value) {
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private String resolveError(JsonNode payload, int status) {
